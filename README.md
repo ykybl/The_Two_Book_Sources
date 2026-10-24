@@ -32,8 +32,11 @@ The Two 阅读书源合集，多仓库采集、双重算法校验后按批次归
 Legado / 简听阅读 中导入书源时，复制以下链接：
 
 - 第1批：`https://cdn.jsdelivr.net/gh/ykybl/The_Two_Book_Sources@main/sources/batch_001.json`
+- 第2批：`https://cdn.jsdelivr.net/gh/ykybl/The_Two_Book_Sources@main/sources/batch_002.json`
 
-> 备用链接（GitHub Raw）：`https://raw.githubusercontent.com/ykybl/The_Two_Book_Sources/main/sources/batch_001.json`
+> 备用链接（GitHub Raw）：
+> - `https://raw.githubusercontent.com/ykybl/The_Two_Book_Sources/main/sources/batch_001.json`
+> - `https://raw.githubusercontent.com/ykybl/The_Two_Book_Sources/main/sources/batch_002.json`
 
 ## 管理命令
 
@@ -50,3 +53,4 @@ python scripts/verify_manage.py
 | 文件 | 条数 | 大小 |
 |------|------|------|
 | sources/batch_001.json | 1,001 | 5.24MB |
+| sources/batch_002.json | 76 | 0.15MB |
