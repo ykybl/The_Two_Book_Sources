@@ -2,22 +2,25 @@
 """
 The Two Book Sources - 书源管理脚本
 
-校验算法:
-  算法1 (xin-verify-book-source): GET bookSourceUrl, 状态码200即有效
-  算法2 (HarmonyOS-book): 首页可达 + 搜索接口可达性测试
+校验算法拆分:
+  check_v1.py — 算法1: xin-verify-book-source (GET首页, 状态码200)
+  check_v2.py — 算法2: HarmonyOS-book (首页+搜索接口可达)
 
-添加新书源流程 (三重过滤):
-  1. 算法2 → 2. 算法1 → 3. 归档前再算法2
-定期维护校验: 仅算法2
+添加新书源流程 (三重过滤 2→1→2):
+  1. check_v2 → 2. check_v1 → 3. check_v2 终验
+定期维护校验: 仅 check_v2
 
 用法:
   python manage.py add <新书源文件或URL>   # 添加新书源（三重过滤）
   python manage.py verify                   # 定期校验（算法2）
   python manage.py stats                    # 显示当前统计
 """
-import json, os, re, sys, glob, urllib3, requests
+import json, os, sys, glob, urllib3, requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
+
+from check_v1 import check as check_v1
+from check_v2 import check as check_v2
 
 urllib3.disable_warnings()
 
@@ -25,11 +28,6 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SOURCES_DIR = os.path.join(ROOT, "sources")
 REPORTS_DIR = os.path.join(ROOT, "reports")
 HEADERS = {"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-
-# 搜索测试关键词
-TEST_KEYWORD = "小说"
-# 搜索请求最小返回字节数（低于此视为搜索接口失效）
-MIN_SEARCH_BYTES = 100
 
 
 # ─── 基础工具 ───
@@ -66,79 +64,6 @@ def next_batch_number():
     return max(nums) + 1 if nums else 1
 
 
-# ─── 算法1: 首页可达性 ───
-
-def check_v1(book, timeout=5):
-    """算法1: GET bookSourceUrl, 状态码200"""
-    url = book.get("bookSourceUrl", "")
-    if not url:
-        return False
-    try:
-        r = requests.get(url, headers=HEADERS, timeout=timeout, verify=False, allow_redirects=True)
-        return r.status_code == 200
-    except Exception:
-        return False
-
-
-# ─── 算法2: 搜索链路可达性 ───
-
-def build_search_url(book):
-    """从书源配置解析搜索URL，返回 (method, url_or_none)"""
-    search_url = book.get("searchUrl", "").strip()
-    if not search_url:
-        return None, None
-
-    # Legado searchUrl 格式: "/search?q={{key}}&page={{page}}"
-    # 或 POST: "{{page}},{"body":"{{key}}","page":{{page}}}"
-    # 检测 POST: 包含 ",," 分隔或以 POST:: 开头
-    if search_url.startswith("POST::") or ",," in search_url:
-        return "POST", None
-
-    # GET: 替换模板变量
-    url = search_url.replace("{{key}}", TEST_KEYWORD).replace("{{page}}", "1")
-    # 去掉分页相关的其他模板
-    url = re.sub(r"\{\{[^}]+\}\}", "1", url)
-
-    base = book.get("bookSourceUrl", "").rstrip("/")
-    if url.startswith("/"):
-        url = base + url
-    elif not url.startswith("http"):
-        url = base + "/" + url
-    return "GET", url
-
-
-def check_v2(book, timeout=8):
-    """算法2: 首页可达 + 搜索接口可达性测试"""
-    # 第一步: 首页必须可达
-    if not check_v1(book, timeout=timeout):
-        return False
-
-    # 第二步: 测试搜索接口
-    method, search_url = build_search_url(book)
-
-    # 无搜索规则或POST搜索: 首页可达即通过
-    if method is None:
-        return True
-    if method == "POST":
-        return True  # POST搜索暂不测试，首页可达即通过
-
-    if not search_url:
-        return True
-
-    try:
-        r = requests.get(search_url, headers=HEADERS, timeout=timeout, verify=False, allow_redirects=True)
-        if r.status_code != 200:
-            return False
-        # 返回内容不能太短（太短说明搜索接口异常）
-        if len(r.content) < MIN_SEARCH_BYTES:
-            return False
-        return True
-    except Exception:
-        return False
-
-
-# ─── 并发校验工具 ───
-
 def run_check(books, check_fn, workers=32, label=""):
     """并发校验，返回 (good_list, bad_count)"""
     good = []
@@ -159,7 +84,7 @@ def run_check(books, check_fn, workers=32, label=""):
     return good, bad
 
 
-# ─── 添加新书源 (三重过滤) ───
+# ─── 添加新书源 (三重过滤 2→1→2) ───
 
 def add_sources(input_path):
     if input_path.startswith("http"):
@@ -191,20 +116,17 @@ def add_sources(input_path):
         print("没有新书源可添加。")
         return
 
-    # 三重过滤
-    # 第1重: 算法2 (搜索链路)
-    print(f"\n=== 第1重过滤: 算法2 (首页+搜索链路) ===")
-    after_v2, removed_v2 = run_check(deduped, check_v2, label="算法2")
+    # 三重过滤: 2 → 1 → 2
+    print(f"\n=== 第1重: 算法2 (首页+搜索链路) ===")
+    after_v2, removed_v2 = run_check(deduped, check_v2, label="v2")
     print(f"算法2: {len(deduped)} → {len(after_v2)} (淘汰 {removed_v2})")
 
-    # 第2重: 算法1 (首页可达)
-    print(f"\n=== 第2重过滤: 算法1 (首页可达) ===")
-    after_v1, removed_v1 = run_check(after_v2, check_v1, label="算法1")
+    print(f"\n=== 第2重: 算法1 (首页可达) ===")
+    after_v1, removed_v1 = run_check(after_v2, check_v1, label="v1")
     print(f"算法1: {len(after_v2)} → {len(after_v1)} (淘汰 {removed_v1})")
 
-    # 第3重: 归档前再用算法2确认
-    print(f"\n=== 第3重过滤: 归档前算法2确认 ===")
-    final, removed_final = run_check(after_v1, check_v2, label="算法2终验")
+    print(f"\n=== 第3重: 算法2 终验 ===")
+    final, removed_final = run_check(after_v1, check_v2, label="v2终验")
     print(f"终验: {len(after_v1)} → {len(final)} (淘汰 {removed_final})")
 
     if not final:
@@ -226,9 +148,9 @@ def add_sources(input_path):
         "action": "add",
         "raw": raw_count,
         "duplicates_removed": dup_removed,
-        "v2_removed": removed_v2,
+        "v2_first_removed": removed_v2,
         "v1_removed": removed_v1,
-        "final_v2_removed": removed_final,
+        "v2_final_removed": removed_final,
         "added": len(final),
         "file": f"sources/{fname}",
     }
