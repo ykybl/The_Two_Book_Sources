@@ -1,24 +1,20 @@
-# Legado 书源合集
+# The Two Book Sources
 
-多仓库采集、去重、URL 可达性校验后的有效书源。
+Legado 阅读书源合集，多仓库采集、URL 可达性校验后去重保存。
 
-## 统计
+## 维护规则
 
-- 采集原始书源：11277 条
-- 去重后：3200 条
-- 校验有效：1678 条
-- 无效（URL 不可达）：1522 条
+- 每个批次的书源单独保存为一个 JSON 文件，不合并到旧文件
+- 新书源入库前与所有已有文件整体去重，**重复的从新书源中删除**，已有文件不动
+- 定期重新校验全部书源，**失效的从原文件中直接删除**
+- 每个文件不超过 10MB，超过则拆分
 
 ## 书源文件
 
-- `book_sources.json` - 合并后的有效书源（8.53MB，1678 条）
-
-## 来源
-
-- XIU2/Yuedu
-- aoaostar/legado
-- tickmao/Novel
+| 文件 | 书源数 | 大小 | 说明 |
+|------|--------|------|------|
+| `book_sources.json` | 1678 | 8.53MB | 第 1 批：XIU2/Yuedu + aoaostar/legado + tickmao/Novel 合并去重校验 |
 
 ## 校验工具
 
-使用 [xin-verify-book-source](https://github.com/CalmXin/xin-verify-book-source) 校验书源 URL 可达性。
+使用 [xin-verify-book-source](https://github.com/CalmXin/xin-verify-book-source) 校验书源 URL 可达性（GET 请求首页，状态码 200 视为有效）。
