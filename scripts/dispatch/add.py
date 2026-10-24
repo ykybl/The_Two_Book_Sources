@@ -84,15 +84,15 @@ def main(input_path):
         print("没有新书源可添加。"); return
 
     print(f"\n=== 第1重: 算法2 ===")
-    after_v2, r1 = run_check(deduped, check_v2, "v2")
+    after_v2, r1 = run_check(deduped, check_v2, label="v2")
     print(f"算法2: {len(deduped)} → {len(after_v2)} (淘汰 {r1})")
 
     print(f"\n=== 第2重: 算法1 ===")
-    after_v1, r2 = run_check(after_v2, check_v1, "v1")
+    after_v1, r2 = run_check(after_v2, check_v1, label="v1")
     print(f"算法1: {len(after_v2)} → {len(after_v1)} (淘汰 {r2})")
 
     print(f"\n=== 第3重: 算法2终验 ===")
-    final, r3 = run_check(after_v1, check_v2, "v2终验")
+    final, r3 = run_check(after_v1, check_v2, label="v2终验")
     print(f"终验: {len(after_v1)} → {len(final)} (淘汰 {r3})")
 
     if not final:
