@@ -1,0 +1,11 @@
+{
+  "date": "2026-10-24T17:20:00",
+  "action": "initial",
+  "raw_collected": 11277,
+  "after_dedup": 3200,
+  "valid": 1678,
+  "invalid": 1522,
+  "sources": ["XIU2/Yuedu", "aoaostar/legado", "tickmao/Novel"],
+  "output_file": "sources/batch_001.json",
+  "output_size_mb": 8.53
+}
